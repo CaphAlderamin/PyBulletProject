@@ -39,12 +39,12 @@ def parse_args():
                         help="the target KL divergence threshold.")
     parser.add_argument("--early-stopping", type=lambda x:bool(strtobool(x)), default=False, nargs="?", const=True, 
                         help="if toggled, the learning of the model will be stoped if it does not improve.")
-    parser.add_argument("--early-stopping-step-start", type=int, default=40000,
+    parser.add_argument("--early-stopping-season-start", type=int, default=25,
                         help="starting step count before early stopping is activated.")
-    parser.add_argument("--early-stopping-patience", type=int, default=50,
+    parser.add_argument("--early-stopping-mean-reward", type=int, default=50,
                         help="number of not improving model updates before early stopping.")
-    parser.add_argument("--early-stopping-min-delta", type=int, default=1e-6,
-                        help="occuracy of improvement needed in order to keep training or execute early stopping.")
+    #parser.add_argument("--early-stopping-min-delta", type=int, default=1e-6,
+    #                    help="occuracy of improvement needed in order to keep training or execute early stopping.")
     parser.add_argument("--resize-resolution", type=int, default=48,
                         help="resize image resolution while preprocessing input images.")
     parser.add_argument("--scores-window", type=int, default=100, #default=100

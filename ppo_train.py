@@ -283,10 +283,11 @@ if __name__ == "__main__":
                               f"{', model saved' if args.model_save else ''}")
                     best_mean_reward = mean_reward
         
-        
-        if s>=25 and mean_reward>50:
-            print(f"Environment solved in {s+1:d} seasons!")
-            break
+        if args.early_stopping:
+            if s>=args.early_stopping_season_start \
+            and mean_reward>args.early_stopping_mean_reward:
+                print(f"Environment solved in {s+1:d} seasons!")
+                break
         
     print(f"Average Score of training: {mean_reward:.3f}")
     elapsed = timeit.default_timer() - start_time
