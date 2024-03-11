@@ -8,8 +8,8 @@ from gym import spaces
 from pybullet_envs.bullet.kuka_diverse_object_gym_env import KukaDiverseObjectEnv  
 import pybullet as p
 
-from ActorCriticModel import *
-from ModelRun import *
+from actor_critic_model import *
+from model_run import *
 
 from arguments_continuous_action import parse_args
 

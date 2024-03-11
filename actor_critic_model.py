@@ -16,9 +16,9 @@ def build_hidden_layer(input_dim, hidden_layers):
     return hidden
 
 class ActorCritic(nn.Module):
-    def __init__(self,state_size,action_size,shared_layers,
+    def __init__(self,channels,state_size,action_size,shared_layers,
                  critic_hidden_layers=[],actor_hidden_layers=[],
-                 seed=0, init_type=None):
+                 seed=1, init_type=None):
         """Initialize parameters and build policy.
         Params
         ======
@@ -31,25 +31,46 @@ class ActorCritic(nn.Module):
             init_type (str): Initialization type
         """
         super(ActorCritic, self).__init__()
+        
         self.init_type = init_type
         self.seed = torch.manual_seed(seed)
-        self.sigma = nn.Parameter(torch.zeros(action_size))
+        #self.sigma = nn.Parameter(torch.zeros(action_size))
 
         # Add shared hidden layer
-        self.conv1 = nn.Conv2d(3, 16, kernel_size=5, stride=2)
-        self.bn1 = nn.BatchNorm2d(16)
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=5, stride=2)
-        self.bn2 = nn.BatchNorm2d(32)
-        self.conv3 = nn.Conv2d(32, 32, kernel_size=5, stride=2)
-        self.bn3 = nn.BatchNorm2d(32)
+        # standart layers
+        #self.conv1 = nn.Conv2d(channels, 16, kernel_size=5, stride=2)
+        #self.bn1 = nn.BatchNorm2d(16)
+        #self.conv2 = nn.Conv2d(16, 32, kernel_size=5, stride=2)
+        #self.bn2 = nn.BatchNorm2d(32)
+        #self.conv3 = nn.Conv2d(32, 32, kernel_size=5, stride=2)
+        #self.bn3 = nn.BatchNorm2d(32)
+        # larger layers
+        self.conv1 = nn.Conv2d(channels, 32, kernel_size=5, stride=2)
+        self.bn1 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=5, stride=2)
+        self.bn2 = nn.BatchNorm2d(64)
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=5, stride=2)
+        self.bn3 = nn.BatchNorm2d(64)
+        # larger layers with decreasing kernel_size and stride
+        #self.conv1 = nn.Conv2d(channels, 32, kernel_size=8, stride=4)
+        #self.bn1 = nn.BatchNorm2d(32)
+        #self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2)
+        #self.bn2 = nn.BatchNorm2d(64)
+        #self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
+        #self.bn3 = nn.BatchNorm2d(64)
 
         # Number of Linear input connections depends on output of conv2d layers
         # and therefore the input image size, so compute it.
         def conv2d_size_out(size, kernel_size = 5, stride = 2):
             return (size - (kernel_size - 1) - 1) // stride  + 1
+        # for larger layers
         convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(state_size[0])))
         convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(state_size[1])))
-        linear_input_size = convh * convw * 32
+        # for larger layers with decreasing kernel_size and stride
+        #convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(state_size[0], 8, 4), 4, 2), 3, 1)
+        #convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(state_size[1], 8, 4), 4, 2), 3, 1)
+        linear_input_size = convh * convw * 64
+        
         self.shared_layers = build_hidden_layer(input_dim=linear_input_size,
                                                 hidden_layers=shared_layers)
 
@@ -105,12 +126,12 @@ class ActorCritic(nn.Module):
             elif self.init_type=='normal':
                 nn.init.normal_(n.weight.data)
             else:
-                raise KeyError('initialization type is not found in the set of existing types')
+                raise KeyError(f'initialization type {self.init_type} not found')
 
     def forward(self, state):
         """Build a network that maps state -> (action, value).
         """
-        def apply_multi_layer(layers,x,f=F.leaky_relu):
+        def apply_multi_layer(layers, x, f=F.leaky_relu):
             for layer in layers:
                 x = f(layer(x))
             return x
@@ -118,7 +139,7 @@ class ActorCritic(nn.Module):
         state = F.relu(self.bn1(self.conv1(state)))
         state = F.relu(self.bn2(self.conv2(state)))
         state = F.relu(self.bn3(self.conv3(state)))
-        state = apply_multi_layer(self.shared_layers,state.view(state.size(0),-1))
+        state = apply_multi_layer(self.shared_layers, state.view(state.size(0),-1))
 
         v_hid = state
         if self.critic_hidden is not None:
@@ -128,7 +149,7 @@ class ActorCritic(nn.Module):
         if self.actor_hidden is not None:
             a_hid = apply_multi_layer(self.actor_hidden,a_hid)
 
-        a = self.tanh(self.actor(a_hid))
+        action = self.tanh(self.actor(a_hid))
         value = self.critic(v_hid).squeeze(-1)
-        return a, value
+        return action, value
     

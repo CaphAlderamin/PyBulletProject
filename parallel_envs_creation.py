@@ -16,7 +16,7 @@ from gym.utils import seeding
 from pybullet_envs.bullet.kuka_diverse_object_gym_env import KukaDiverseObjectEnv  
 import pybullet as p
 
-def worker(remote, env_fn, resize, device):
+def worker(remote, env_fn, resize, seed):
     # Ignore CTRL+C in the worker process
     #signal.signal(signal.SIGINT, signal.SIG_IGN)
     print("Worker init with id", os.getpid())
@@ -122,7 +122,7 @@ def make_env(idx, test, seed, capture_video, run_name, device):
         renders=False, 
         isDiscrete=False, 
         removeHeightHack=False, 
-        maxSteps=50
+        maxSteps=20
     )
     env.observation_space = spaces.Box(low=0., high=1., shape=(84, 84, 3), dtype=np.float32)
     env.action_space = spaces.Box(low=-1, high=1, shape=(5,1))
@@ -136,7 +136,7 @@ def make_env(idx, test, seed, capture_video, run_name, device):
     env.np_random = seeding.np_random(seed)[0]
     env.seed(seed)
     env.action_space.seed(seed)
-    env.observation_space.seed(seed)
+    env.observation_space.seed(seed)        
     return env
 
 def make_batch_env(test, resize, num_envs, seed, capture_video, run_name, device=torch.device("cpu")):

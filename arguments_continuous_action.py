@@ -21,7 +21,7 @@ def parse_args():
                         help="the entropy coefficient beta")
     parser.add_argument("--num-minibatches", type=int, default=32, 
                         help="the number of mini-batches.")
-    parser.add_argument("--update-epochs", type=int, default=10, 
+    parser.add_argument("--update-epochs", type=int, default=20, 
                         help="the K epochs to update the policy.")
     parser.add_argument("--norm-adv", type=lambda x:bool(strtobool(x)), default=True, nargs="?", const=True, 
                         help="if toggled, advantages normalization will be used.")
@@ -55,7 +55,7 @@ def parse_args():
     # Environment arguments
     parser.add_argument("--num-envs", type=int, default=20, #default=mp.cpu_count()
                         help="the number of parallel game environment.")
-    parser.add_argument("--num-steps", type=int, default=1024, #default=1000
+    parser.add_argument("--num-steps", type=int, default=1024, #default=1024
                         help="the number of steps to run in each environment per policy rollout.")
     parser.add_argument("--exp-name", type=str, default="ppo_continuous_action", 
                         help="the name of this experiment.")

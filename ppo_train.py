@@ -17,6 +17,17 @@ from model_run import *
 
 from arguments_continuous_action import parse_args
 
+# cat all agents
+def concat_all(v):
+    #print(v.shape)
+    if len(v.shape) == 3:#actions
+        return v.reshape([-1, v.shape[-1]])
+    if len(v.shape) == 5:#states
+        v = v.reshape([-1, v.shape[-3], v.shape[-2],v.shape[-1]])
+        #print(v.shape)
+        return v
+    return v.reshape([-1])
+
 if __name__ == "__main__":
     args = parse_args()
     if args.info:
@@ -75,6 +86,8 @@ if __name__ == "__main__":
 
     # number of agents
     num_agents = envs.num_envs
+    # number of image channels
+    num_channels = envs.observation_space.shape[-1]
     # size of each action
     action_size = envs.action_space.shape[0]
     # size of screen
@@ -86,20 +99,6 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.backends.cudnn.deterministic = args.torch_deterministic
-    
-    if args.info:
-        print("\nGPU info:")
-        print(f"  selected device: {device}")
-        
-        print("\nAgents info:")
-        print(f'  number_of_agents/envs: {num_agents}/{args.num_envs}')
-    
-        print("\nEnvs info:")
-        print(f"  action_space: {envs.action_space}")
-        print(f"  each_action_size: {action_size}")
-        print(f"\n  observation_space: {envs.observation_space}")
-        print(f"  screen_height: {screen_height}")
-        print(f"  screen_width:  {screen_width}")
     
     # robot arm camera demonstration
     if args.info_camera:
@@ -120,17 +119,37 @@ if __name__ == "__main__":
     #    seed=0
     #).to(device)
     policy=ActorCritic(
+        channels=num_channels,
         state_size=(screen_height, screen_width),
         action_size=action_size,
         shared_layers=[512, 256, 128, 64],
         critic_hidden_layers=[512],
         actor_hidden_layers=[512],
         init_type='xavier-uniform',
-        seed=0
+        seed=args.seed
     ).to(device)
 
     # the adam optimizer with learning rate 3e-4 (defoult) (optim.SGD is also possible)
     optimizer = optim.Adam(policy.parameters(), lr=args.learning_rate)
+    
+    if args.info:
+        print("\nGPU info:")
+        print(f"  selected device: {device}")
+        
+        print("\nAgents info:")
+        print(f'  number_of_agents/envs: {num_agents}/{args.num_envs}')
+    
+        print("\nEnvs info:")
+        print(f"  action_space: {envs.action_space}")
+        print(f"  each_action_size: {action_size}")
+        print(f"\n  observation_space: {envs.observation_space}")
+        print(f"  num_channels: {num_channels}")
+        print(f"  screen_height: {screen_height}")
+        print(f"  screen_width:  {screen_width}")
+        
+        print("\nAgent info:")
+        print(policy, "\n")
+        print(optimizer, "\n")
     
     # set up the models non constant parameters
     #discount = args.discount_gamma
@@ -145,15 +164,13 @@ if __name__ == "__main__":
     # start the timer
     start_time = timeit.default_timer()
     
-    # model learning
-    print("\nModel learning start:")
     best_mean_reward = None
-
     scores_window = deque(maxlen=args.scores_window)  # last "100" scores
     save_scores = []
 
+    # model learning
+    print("\nModel learning start:")
     for s in range(args.total_seasons):
-        
         # annealing the learning rate if instructed to do so
         if args.anneal_lr:
             frac = 1.0 - (s - 1.0) / args.total_seasons
@@ -161,6 +178,7 @@ if __name__ == "__main__":
             optimizer.param_groups[0]["lr"] = lrnow
         
         policy.eval()
+        
         old_probs_lst, states_lst, actions_lst, rewards_lst,\
         values_lst, dones_list = collect_trajectories(
             envs=envs,
@@ -169,6 +187,7 @@ if __name__ == "__main__":
             action_size=action_size,
             tmax=args.num_steps//num_agents,
             nrand = 5,
+            seed=args.seed, 
             device = device
         )
         
@@ -185,17 +204,6 @@ if __name__ == "__main__":
         gae = (gae - gae.mean()) / (gae.std() + 1e-8)
 
         policy.train()
-
-        # cat all agents
-        def concat_all(v):
-            #print(v.shape)
-            if len(v.shape) == 3:#actions
-                return v.reshape([-1, v.shape[-1]])
-            if len(v.shape) == 5:#states
-                v = v.reshape([-1, v.shape[-3], v.shape[-2],v.shape[-1]])
-                #print(v.shape)
-                return v
-            return v.reshape([-1])
 
         old_probs_lst = concat_all(old_probs_lst)
         states_lst = concat_all(states_lst)
@@ -233,6 +241,7 @@ if __name__ == "__main__":
                 L_VF = 0.5 * (tv - values).pow(2).mean()
                 # clipped surrogate
                 L = -(L_CLIP - L_VF + beta*S)
+                
                 optimizer.zero_grad()
                 # This may need retain_graph=True on the backward pass
                 # as pytorch automatically frees the computational graph after
@@ -253,11 +262,12 @@ if __name__ == "__main__":
         writer.add_scalar("epsilon", epsilon, s)
         writer.add_scalar("beta", beta, s)
         mean_reward = np.mean(scores_window)
-        writer.add_scalar("Score", mean_reward, s)
+        writer.add_scalar("Season score", season_score, s)
+        writer.add_scalar("100 episode mean score", mean_reward, s)
         
         # display some progress every n iterations
         elapsed = timeit.default_timer() - start_time
-        print(f"Season {s} end, Score: {mean_reward:.3f}, Elapsed time: {timedelta(seconds=elapsed)}")
+        print(f"Season {s} end, with score {int(season_score)}, Score: {mean_reward:.3f}, Elapsed time: {timedelta(seconds=elapsed)}")
         
         if best_mean_reward is None or best_mean_reward+1 < mean_reward:
                     # For saving the model and possibly resuming training
