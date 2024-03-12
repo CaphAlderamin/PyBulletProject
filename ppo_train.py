@@ -17,7 +17,7 @@ from model_run import *
 
 from arguments_continuous_action import parse_args
 
-# cat all agents
+# Cat all agents
 def concat_all(v):
     #print(v.shape)
     if len(v.shape) == 3:#actions
@@ -33,7 +33,7 @@ if __name__ == "__main__":
     if args.info:
         print(f"\nArguments info: \n  {args}") 
         
-    # set logging experiment name
+    # Set logging experiment name
     if args.clearml_task_name != None:
         run_name = args.clearml_task_name
     else:
@@ -41,7 +41,7 @@ if __name__ == "__main__":
         run_time = time.strftime("%m-%d-%Y_%H-%M-%S", time.localtime())
         run_name = f"{args.gym_id}_{args.exp_name}_s{args.seed}_{run_time}"
         
-    # init ClearML logging
+    # Init ClearML logging
     if args.track:
         from clearml import Task
         print("\nClearMl info:")
@@ -51,26 +51,26 @@ if __name__ == "__main__":
             tags=args.clearml_tags
         )
         task.connect(args)
-    # init TensorBoard logging
+    # Init TensorBoard logging
     writer = SummaryWriter(f"runs/{run_name}")
     writer.add_text(
         "hyperparameters",
         "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
     )
     
-    # create directry for models
+    # Create directry for models
     if args.model_save:
         os.makedirs(f"models/{run_name}", exist_ok=True)
     
-    # set image resolution resize 
+    # Set image resolution resize 
     resize = T.Compose([
         T.ToPILImage(),
         T.Resize(args.resize_resolution, interpolation=Image.BICUBIC),
         T.ToTensor()
     ])
-    # set the calculation device (cuda:0/cpu)
+    # Set the calculation device (cuda:0/cpu)
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
-    # create parallel PyBullet envs
+    # Create parallel PyBullet envs
     print("\nMultiprocessing info:")
     envs = make_batch_env(
         test=False,            
@@ -81,26 +81,26 @@ if __name__ == "__main__":
         run_name=run_name,
         device=device
     )
-    # reset all parallel PyBullet envs
+    # Reset all parallel PyBullet envs
     envs.reset()
 
-    # number of agents
+    # Number of agents
     num_agents = envs.num_envs
-    # number of image channels
+    # Number of image channels
     num_channels = envs.observation_space.shape[-1]
-    # size of each action
+    # Size of each action
     action_size = envs.action_space.shape[0]
-    # size of screen
+    # Size of screen
     init_screen = envs.get_screen().to(device)
     _, _, screen_height, screen_width = init_screen.shape
     
-    # set seeds for reproducibility
+    # Set seeds for reproducibility
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.backends.cudnn.deterministic = args.torch_deterministic
     
-    # robot arm camera demonstration
+    # Robot arm camera demonstration
     if args.info_camera:
         plt.figure()
         plt.imshow(init_screen[0].cpu().squeeze(0).permute(1, 2, 0).numpy(),
@@ -128,9 +128,13 @@ if __name__ == "__main__":
         init_type='xavier-uniform',
         seed=args.seed
     ).to(device)
-
-    # the adam optimizer with learning rate 3e-4 (defoult) (optim.SGD is also possible)
+    # The adam optimizer with learning rate 3e-4 (defoult) (optim.SGD is also possible)
     optimizer = optim.Adam(policy.parameters(), lr=args.learning_rate)
+    
+    # variables for saving model
+    policy_shared_layers = [layer.out_features for layer in policy.shared_layers]
+    policy_critic_hidden_layers = [layer.out_features for layer in policy.critic_hidden]
+    policy_actor_hidden_layers = [layer.out_features for layer in policy.actor_hidden]
     
     if args.info:
         print("\nGPU info:")
@@ -148,10 +152,14 @@ if __name__ == "__main__":
         print(f"  screen_width:  {screen_width}")
         
         print("\nAgent info:")
+        print(f"policy.shared_layers: {policy_shared_layers}")
+        print(f"policy.critic_hidden_layers: {policy_critic_hidden_layers}")
+        print(f"policy.actor_hidden_layers: {policy_critic_hidden_layers}")
+        print(f"policy.init_type: {policy.init_type}\n")
         print(policy, "\n")
         print(optimizer, "\n")
     
-    # set up the models non constant parameters
+    # Set up the models non constant parameters
     #discount = args.discount_gamma
     epsilon = args.ratio_epsilon
     beta = args.entropy_beta
@@ -161,7 +169,7 @@ if __name__ == "__main__":
     tmax = args.num_steps//num_agents #env episode steps
     #tmax = 40//num_agents
     
-    # start the timer
+    # Start the timer
     start_time = timeit.default_timer()
     
     best_mean_reward = None
@@ -171,7 +179,7 @@ if __name__ == "__main__":
     # model learning
     print("\nModel learning start:")
     for s in range(args.total_seasons):
-        # annealing the learning rate if instructed to do so
+        # Annealing the learning rate if instructed to do so
         if args.anneal_lr:
             frac = 1.0 - (s - 1.0) / args.total_seasons
             lrnow = frac * args.learning_rate
@@ -199,12 +207,15 @@ if __name__ == "__main__":
             rewards = rewards_lst,
             values = values_lst,
             dones=dones_list,
+            gae_lambda=args.gae_lambda,
+            discount_gamma=args.discount_gamma,
             device = device
         )
         gae = (gae - gae.mean()) / (gae.std() + 1e-8)
 
         policy.train()
 
+        # Concatenate tensors
         old_probs_lst = concat_all(old_probs_lst)
         states_lst = concat_all(states_lst)
         actions_lst = concat_all(actions_lst)
@@ -213,9 +224,10 @@ if __name__ == "__main__":
         gae = concat_all(gae)
         target_value = concat_all(target_value)
         
-        # gradient ascent step
+        # Gradient ascent step
         n_sample = len(old_probs_lst)//args.batch_size
         idx = np.arange(len(old_probs_lst))
+        
         for epoch in range(args.update_epochs):
             np.random.shuffle(idx)
             for b in range(n_sample):
@@ -225,13 +237,19 @@ if __name__ == "__main__":
                 actions = actions_lst[ind]
                 old_probs = old_probs_lst[ind]
 
+                # Policy network
                 action_est, values = policy(states_lst[ind])
+                
                 sigma = nn.Parameter(torch.zeros(action_size))
-                dist = torch.distributions.Normal(action_est, F.softplus(sigma).to(device))
+                sigma = F.softplus(sigma).to(device)
+                dist = torch.distributions.Normal(action_est, sigma)
+                
                 log_probs = dist.log_prob(actions)
                 log_probs = torch.sum(log_probs, dim=-1)
+                
                 entropy = torch.sum(dist.entropy(), dim=-1)
 
+                # PPO loss calculation
                 ratio = torch.exp(log_probs - old_probs)
                 ratio_clipped = torch.clamp(ratio, 1 - epsilon, 1 + epsilon)
                 L_CLIP = torch.mean(torch.min(ratio*g, ratio_clipped*g))
@@ -239,18 +257,18 @@ if __name__ == "__main__":
                 S = entropy.mean()
                 # squared-error value function loss
                 L_VF = 0.5 * (tv - values).pow(2).mean()
+                
                 # clipped surrogate
-                L = -(L_CLIP - L_VF + beta*S)
+                loss = -(L_CLIP - L_VF + beta * S)
                 
                 optimizer.zero_grad()
                 # This may need retain_graph=True on the backward pass
                 # as pytorch automatically frees the computational graph after
                 # the backward pass to save memory
                 # Without this, the chain of derivative may get lost
-                L.backward(retain_graph=True)
+                loss.backward(retain_graph=True)
                 torch.nn.utils.clip_grad_norm_(policy.parameters(), 10.0)
                 optimizer.step()
-                del(L)
 
         # the clipping parameter reduces as time goes on
         epsilon*=.999
@@ -273,8 +291,16 @@ if __name__ == "__main__":
                     # For saving the model and possibly resuming training
                     if args.model_save:
                         torch.save({
+                                # Base
                                 'policy_state_dict': policy.state_dict(),
                                 'optimizer_state_dict': optimizer.state_dict(),
+                                # Model reload variables
+                                'policy.shared_layers': policy_shared_layers,
+                                'policy.critic_hidden_layers': policy_critic_hidden_layers,
+                                'policy.actor_hidden_layers': policy_critic_hidden_layers,
+                                'policy.init_type': policy.init_type,
+                                # Learning variables                    
+                                'lr': optimizer.param_groups[0]["lr"],
                                 'epsilon': epsilon,
                                 'beta': beta
                                 }, f"models/{run_name}/complete_model.pt")

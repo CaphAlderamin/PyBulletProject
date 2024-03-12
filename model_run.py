@@ -100,11 +100,8 @@ def collect_trajectories(envs, policy, num_agents, action_size, tmax=200, nrand=
     
     return prob_list, state_list, action_list, reward_list, value_list, done_list
 
-def calc_returns(rewards, values, dones, device=torch.device("cpu")):
+def calc_returns(rewards, values, dones, gae_lambda, discount_gamma, device=torch.device("cpu")):
     num_step, num_agent = rewards.shape
-    
-    TAU = 0.95
-    discount = 0.99
     
     # Create empty buffer
     #gae = torch.zeros(num_step, num_agent).float().to(device)
@@ -118,7 +115,7 @@ def calc_returns(rewards, values, dones, device=torch.device("cpu")):
     
     gae_current = torch.zeros(num_agent).float().to(device)
     
-    gammas = discount * (1. - dones.float())
+    gammas = discount_gamma * (1. - dones.float())
 
     for irow in reversed(range(num_step)):
         values_current = values[irow]
@@ -129,7 +126,7 @@ def calc_returns(rewards, values, dones, device=torch.device("cpu")):
         td_error = rewards_current + gamma * values_next - values_current
         
         # Update GAE, returns
-        gae_current = td_error + gamma * TAU * gae_current
+        gae_current = td_error + gamma * gae_lambda * gae_current
         returns_current = rewards_current + gamma * returns_current
         
         # Set GAE, returns to buffer

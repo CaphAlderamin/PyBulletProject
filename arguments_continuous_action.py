@@ -10,13 +10,13 @@ def parse_args():
     parser.add_argument("--learning-rate", type=float, default=3e-4, 
                         help="the learning rate of the optimazer.")
     
-    parser.add_argument("--gae", type=lambda x:bool(strtobool(x)), default=True, nargs="?", const=True, 
-                        help="if toggled, GAE is been used for advantage computation.")
+    #parser.add_argument("--gae", type=lambda x:bool(strtobool(x)), default=True, nargs="?", const=True, 
+    #                    help="if toggled, GAE is been used for advantage computation.")
     parser.add_argument("--gae-lambda", type=float, default=0.95, 
                         help="tha lambda for the general advantage estimation.")
-    
     parser.add_argument("--discount-gamma", type=float, default=0.99, 
                         help="the discount factor gamma.")
+    
     parser.add_argument("--ratio-epsilon", type=float, default=0.07, 
                         help="the ratio used to clip r=new_probs/old_probs during training.")
     parser.add_argument("--entropy-beta", type=float, default=0.01, 
@@ -27,18 +27,17 @@ def parse_args():
     parser.add_argument("--update-epochs", type=int, default=10, 
                         help="the K epochs to update the policy.")
     
-    parser.add_argument("--norm-adv", type=lambda x:bool(strtobool(x)), default=True, nargs="?", const=True, 
-                        help="if toggled, advantages normalization will be used.")
-    parser.add_argument("--clip-coef", type=float, default=0.2, 
-                        help="the surrogate clipping coefficient (ppo clipped policy objective).")
-    parser.add_argument("--clip-vloss", type=lambda x:bool(strtobool(x)), default=True, nargs="?", const=True, 
-                        help="if toggled, clipped loss will be used for the value function, as per the paper.")
+    #parser.add_argument("--norm-adv", type=lambda x:bool(strtobool(x)), default=True, nargs="?", const=True, 
+    #                    help="if toggled, advantages normalization will be used.")
+    #parser.add_argument("--clip-coef", type=float, default=0.2, 
+    #                    help="the surrogate clipping coefficient (ppo clipped policy objective).")
+    #parser.add_argument("--clip-vloss", type=lambda x:bool(strtobool(x)), default=True, nargs="?", const=True, 
+    #                    help="if toggled, clipped loss will be used for the value function, as per the paper.")
     
-    parser.add_argument("--ent-coef", type=float, default=0.0, 
-                        help="coefficient of the entropy.")
-    
-    parser.add_argument("--vf-coef", type=float, default=0.5, 
-                        help="coefficient of the value function.")
+    #parser.add_argument("--ent-coef", type=float, default=0.01, 
+    #                    help="coefficient of the entropy.")
+    #parser.add_argument("--vf-coef", type=float, default=0.5, 
+    #                    help="coefficient of the value function.")
     
     parser.add_argument("--max-grad-norm", type=float, default=0.5, 
                         help="the maximum norm for the gradient clipping.")
@@ -74,7 +73,7 @@ def parse_args():
                         help="seed of the experiment.")
     #parser.add_argument("--total-timesteps", type=int, default=2000000, 
     #                    help="total timesteps of the experiments.")
-    parser.add_argument("--total-seasons", type=int, default=1000000, #default=1000000
+    parser.add_argument("--total-seasons", type=int, default=2000, #default=1000000
                         help="total timesteps of the experiments.")
     # GPU arguments
     parser.add_argument("--torch-deterministic", type=lambda x:bool(strtobool(x)), default=True, nargs="?", const=True, 
