@@ -5,39 +5,47 @@ from distutils.util import strtobool
 def parse_args():
     parser = argparse.ArgumentParser()
     # Algorithm arguments
-    parser.add_argument("--learning-rate", type=float, default=3e-4, 
-                        help="the learning rate of the optimazer.")
     parser.add_argument("--anneal-lr", type=lambda x:bool(strtobool(x)), default=True, nargs="?", const=True, 
                         help="if toggled, learning rate annealing for policy and value networks.")
+    parser.add_argument("--learning-rate", type=float, default=3e-4, 
+                        help="the learning rate of the optimazer.")
+    
     parser.add_argument("--gae", type=lambda x:bool(strtobool(x)), default=True, nargs="?", const=True, 
                         help="if toggled, GAE is been used for advantage computation.")
     parser.add_argument("--gae-lambda", type=float, default=0.95, 
                         help="tha lambda for the general advantage estimation.")
+    
     parser.add_argument("--discount-gamma", type=float, default=0.99, 
                         help="the discount factor gamma.")
     parser.add_argument("--ratio-epsilon", type=float, default=0.07, 
                         help="the ratio used to clip r=new_probs/old_probs during training.")
     parser.add_argument("--entropy-beta", type=float, default=0.01, 
                         help="the entropy coefficient beta")
+    
     parser.add_argument("--num-minibatches", type=int, default=32, 
                         help="the number of mini-batches.")
-    parser.add_argument("--update-epochs", type=int, default=20, 
+    parser.add_argument("--update-epochs", type=int, default=10, 
                         help="the K epochs to update the policy.")
+    
     parser.add_argument("--norm-adv", type=lambda x:bool(strtobool(x)), default=True, nargs="?", const=True, 
                         help="if toggled, advantages normalization will be used.")
     parser.add_argument("--clip-coef", type=float, default=0.2, 
                         help="the surrogate clipping coefficient (ppo clipped policy objective).")
     parser.add_argument("--clip-vloss", type=lambda x:bool(strtobool(x)), default=True, nargs="?", const=True, 
                         help="if toggled, clipped loss will be used for the value function, as per the paper.")
+    
     parser.add_argument("--ent-coef", type=float, default=0.0, 
                         help="coefficient of the entropy.")
+    
     parser.add_argument("--vf-coef", type=float, default=0.5, 
                         help="coefficient of the value function.")
+    
     parser.add_argument("--max-grad-norm", type=float, default=0.5, 
                         help="the maximum norm for the gradient clipping.")
+    
     parser.add_argument("--target-kl", type=float, default=None,
                         help="the target KL divergence threshold.")
-    parser.add_argument("--early-stopping", type=lambda x:bool(strtobool(x)), default=False, nargs="?", const=True, 
+    parser.add_argument("--early-stopping", type=lambda x:bool(strtobool(x)), default=True, nargs="?", const=True, 
                         help="if toggled, the learning of the model will be stoped if it does not improve.")
     parser.add_argument("--early-stopping-season-start", type=int, default=25,
                         help="starting step count before early stopping is activated.")
@@ -45,6 +53,7 @@ def parse_args():
                         help="number of not improving model updates before early stopping.")
     #parser.add_argument("--early-stopping-min-delta", type=int, default=1e-6,
     #                    help="occuracy of improvement needed in order to keep training or execute early stopping.")
+    
     parser.add_argument("--resize-resolution", type=int, default=48,
                         help="resize image resolution while preprocessing input images.")
     parser.add_argument("--scores-window", type=int, default=100, #default=100

@@ -158,7 +158,7 @@ if __name__ == "__main__":
     #opt_epoch = args.update_epochs
     #season = 10 #season = args.total_seasons
     #batch_size = args.batch_size #batch_size = 128
-    #tmax = args.num_steps//num_agents #env episode steps
+    tmax = args.num_steps//num_agents #env episode steps
     #tmax = 40//num_agents
     
     # start the timer
@@ -185,7 +185,7 @@ if __name__ == "__main__":
             policy=policy, 
             num_agents=num_agents, 
             action_size=action_size,
-            tmax=args.num_steps//num_agents,
+            tmax=tmax,
             nrand = 5,
             seed=args.seed, 
             device = device
@@ -216,8 +216,8 @@ if __name__ == "__main__":
         # gradient ascent step
         n_sample = len(old_probs_lst)//args.batch_size
         idx = np.arange(len(old_probs_lst))
-        np.random.shuffle(idx)
         for epoch in range(args.update_epochs):
+            np.random.shuffle(idx)
             for b in range(n_sample):
                 ind = idx[b*args.batch_size:(b+1)*args.batch_size]
                 g = gae[ind]
@@ -262,8 +262,8 @@ if __name__ == "__main__":
         writer.add_scalar("epsilon", epsilon, s)
         writer.add_scalar("beta", beta, s)
         mean_reward = np.mean(scores_window)
+        writer.add_scalar("Score", mean_reward, s)
         writer.add_scalar("Season score", season_score, s)
-        writer.add_scalar("100 episode mean score", mean_reward, s)
         
         # display some progress every n iterations
         elapsed = timeit.default_timer() - start_time

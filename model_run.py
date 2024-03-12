@@ -6,10 +6,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 writer = SummaryWriter()
-i_episode = 0
+episode_steps = 0
 def collect_trajectories(envs, policy, num_agents, action_size, tmax=200, nrand=5, seed=1, device=torch.device("cpu")):
     
-    global i_episode 
+    global episode_steps 
     global writer
     
     episode_rewards = 0
@@ -40,17 +40,32 @@ def collect_trajectories(envs, policy, num_agents, action_size, tmax=200, nrand=
         reward = torch.tensor(reward, device=device)
         
     for t in range(tmax):
+        # Get the current states from the environment
         states = envs.get_screen().to(device)
+        
+        # Compute the estimated actions and their corresponding values
         action_est, values = policy(states)
+        
+        # Initialize the standard deviation parameter
         sigma = nn.Parameter(torch.zeros(action_size))
-        dist = torch.distributions.Normal(action_est, F.softplus(sigma).to(device))
+        sigma = F.softplus(sigma).to(device)
+        
+        # Sample actions from the Normal distribution
+        dist = torch.distributions.Normal(action_est, sigma)
         actions = dist.sample()
+        
+        # Calculate the log probabilities of the sampled actions
         log_probs = dist.log_prob(actions)
         log_probs = torch.sum(log_probs, dim=-1).detach()
+        
+        # Detach the values and actions from the computation graph
         values = values.detach()
         actions = actions.detach()
         
-        next_state, reward, done, _  = envs.step(actions.cpu().numpy())
+        # Step the environment using the sampled actions and store the results
+        _, reward, done, _  = envs.step(actions.cpu().numpy())
+        
+        # Convert the rewards and dones to PyTorch tensors
         rewards = to_tensor(reward)
         dones = to_tensor(done)
 
@@ -63,12 +78,19 @@ def collect_trajectories(envs, policy, num_agents, action_size, tmax=200, nrand=
 
         if np.any(dones.cpu().numpy()):
             episode_rewards += rewards.sum(dim=0)
-            i_episode += dones.sum(dim=0)
-            writer.add_scalar('Episodes average rewards', episode_rewards.item()/dones.sum(dim=0).item(), i_episode.item())
-            print(f"episode {i_episode} done, rewards: {int(episode_rewards): <2} ({rewards.cpu().numpy().astype(int)})")
+            episode_steps += dones.sum(dim=0)
+            
+            # Log the average rewards for the episode
+            avg_episode_rewards = episode_rewards.item() / dones.sum(dim=0).item()
+            writer.add_scalar('Episodes average rewards', avg_episode_rewards, episode_steps.item())
+            
+            print(f"episode {episode_steps} done, rewards: {int(episode_rewards): <2} ({rewards.cpu().numpy().astype(int)})")
+            
+            # Reset the environment and reset the episode rewards and steps
             state = envs.reset()
             episode_rewards = 0
-                
+    
+    # Convert the lists to PyTorch tensors            
     prob_list = torch.cat(prob_list, dim=0)
     state_list = torch.cat(state_list, dim=0)
     action_list = torch.cat(action_list, dim=0)
