@@ -110,6 +110,7 @@ if __name__ == "__main__":
     
     # run policy!
     #policy=ActorCritic(
+    #    channels=num_channels,
     #    state_size=(screen_height, screen_width),
     #    action_size=action_size,
     #    shared_layers=[128, 64],
@@ -276,13 +277,19 @@ if __name__ == "__main__":
         # this reduces exploration in later runs
         beta*=.998
 
+        y_pred = values_lst.cpu().numpy()
+        y_true = target_value.cpu().numpy()
+        var_y = np.var(y_true)
+        explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
+        
         writer.add_scalar("learning_rate", optimizer.param_groups[0]["lr"], s)
         writer.add_scalar("epsilon", epsilon, s)
         writer.add_scalar("beta", beta, s)
         mean_reward = np.mean(scores_window)
         writer.add_scalar("Score", mean_reward, s)
         writer.add_scalar("Season score", season_score, s)
-        
+        writer.add_scalar("explained_variance", explained_var, s)
+
         # display some progress every n iterations
         elapsed = timeit.default_timer() - start_time
         print(f"Season {s} end, with score {int(season_score)}, Score: {mean_reward:.3f}, Elapsed time: {timedelta(seconds=elapsed)}")

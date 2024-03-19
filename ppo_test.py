@@ -52,15 +52,15 @@ if __name__ == "__main__":
     #PATH = 'models\policy_ppo_m50_normal2.pt'
     #PATH = 'models\policy_ppo_m50_big1.pt'
     #PATH = 'models\KukaDiverseObjectGrasping-v0_ppo_continuous_action_s1_03-06-2024_18-07-13\complete_model_.pt'
-    PATH = 'models\KukaDiverseObjectGrasping-v0_ppo_continuous_action_s1_03-06-2024_19-05-34\complete_model.pt'
+    PATH = 'models\KukaDiverseObjectEnv_ppo_continuous_action_s1_03-11-2024_22-54-01\complete_model.pt'
     
     # Evaluate episodes
-    episodes = 50
+    episodes = 1000
     
     env = KukaDiverseObjectEnv(
             renders=False, 
             isDiscrete=False, 
-            removeHeightHack=True, 
+            removeHeightHack=False, 
             maxSteps=20, 
             isTest=True
         )
@@ -75,24 +75,25 @@ if __name__ == "__main__":
     init_screen = get_screen(env=env, resize=resize)
     _, _, screen_height, screen_width = init_screen.shape
     
-    policy=ActorCritic(
-            state_size=(screen_height, screen_width),
-            action_size=action_size,
-            shared_layers=[128, 64],
-            critic_hidden_layers=[64],
-            actor_hidden_layers=[64],
-            init_type='xavier-uniform',
-            seed=0
-        ).to(device)
     #policy=ActorCritic(
     #        state_size=(screen_height, screen_width),
     #        action_size=action_size,
-    #        shared_layers=[512, 256, 128, 64],
-    #        critic_hidden_layers=[256, 128],
-    #        actor_hidden_layers=[256, 128],
+    #        shared_layers=[128, 64],
+    #        critic_hidden_layers=[64],
+    #        actor_hidden_layers=[64],
     #        init_type='xavier-uniform',
     #        seed=0
     #    ).to(device)
+    policy=ActorCritic(
+        channels=3,
+        state_size=(screen_height, screen_width),
+        action_size=action_size,
+        shared_layers=[512, 256, 128, 64],
+        critic_hidden_layers=[512],
+        actor_hidden_layers=[512],
+        init_type='xavier-uniform',
+        seed=0
+    ).to(device)
     
     # load the model
     checkpoint = torch.load(PATH)

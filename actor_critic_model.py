@@ -66,10 +66,11 @@ class ActorCritic(nn.Module):
         # for larger layers
         convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(state_size[0])))
         convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(state_size[1])))
+        linear_input_size = convh * convw * 64
         # for larger layers with decreasing kernel_size and stride
         #convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(state_size[0], 8, 4), 4, 2), 3, 1)
         #convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(state_size[1], 8, 4), 4, 2), 3, 1)
-        linear_input_size = convh * convw * 64
+        #linear_input_size = convh * convw * 32
         
         self.shared_layers = build_hidden_layer(input_dim=linear_input_size,
                                                 hidden_layers=shared_layers)

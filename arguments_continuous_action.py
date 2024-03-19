@@ -48,7 +48,7 @@ def parse_args():
                         help="if toggled, the learning of the model will be stoped if it does not improve.")
     parser.add_argument("--early-stopping-season-start", type=int, default=25,
                         help="starting step count before early stopping is activated.")
-    parser.add_argument("--early-stopping-mean-reward", type=int, default=50,
+    parser.add_argument("--early-stopping-mean-reward", type=int, default=98,
                         help="number of not improving model updates before early stopping.")
     #parser.add_argument("--early-stopping-min-delta", type=int, default=1e-6,
     #                    help="occuracy of improvement needed in order to keep training or execute early stopping.")
