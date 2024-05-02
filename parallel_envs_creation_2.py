@@ -16,14 +16,6 @@ from gym.utils import seeding
 from pybullet_envs.bullet.kuka_diverse_object_gym_env import KukaDiverseObjectEnv  
 import pybullet as p
 
-#from stable_baselines3.common.atari_wrappers import (  # isort:skip
-    #ClipRewardEnv,
-    #EpisodicLifeEnv,
-    #FireResetEnv,
-    #MaxAndSkipEnv,
-    #NoopResetEnv,
-#)
-
 def worker(remote, env_fn, resize, seed):
     # Ignore CTRL+C in the worker process
     #signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -36,25 +28,17 @@ def worker(remote, env_fn, resize, seed):
             #print("Received command:", cmd)
             if cmd == 'step':
                     obs, reward, done, _, info = env.step(data)
-                    obs = obs.transpose((2, 0, 1))
-                    obs = np.ascontiguousarray(obs, dtype=np.float32) / 255
-                    obs = torch.from_numpy(obs)
-                    obs = resize(obs).unsqueeze(0)
                     remote.send((obs, reward, done, info))
-            #elif cmd == 'get_screen':
-            #    #screen = env._get_observation()
-            #    screen = env._get_observation().transpose((2, 0, 1))
-            #    screen = np.ascontiguousarray(screen, dtype=np.float32) / 255
-            #    screen = torch.from_numpy(screen)
-            #    screen = resize(screen).unsqueeze(0)
-            #    remote.send(screen)
-            #    #remote.send(screen.cpu().numpy())
+            elif cmd == 'get_screen':
+                #screen = env._get_observation()
+                screen = env._get_observation().transpose((2, 0, 1))
+                screen = np.ascontiguousarray(screen, dtype=np.float32) / 255
+                screen = torch.from_numpy(screen)
+                screen = resize(screen).unsqueeze(0)
+                remote.send(screen)
+                #remote.send(screen.cpu().numpy())
             elif cmd == 'reset':
-                obs = env.reset()[0]
-                obs = obs.transpose((2, 0, 1))
-                obs = np.ascontiguousarray(obs, dtype=np.float32) / 255
-                obs = torch.from_numpy(obs)
-                obs = resize(obs).unsqueeze(0)
+                obs = env.reset()
                 remote.send(obs)
             elif cmd == 'close':
                 remote.close()
@@ -93,16 +77,16 @@ class MultiprocessVectorEnv:
             remote.send(('step', action))
         results = [remote.recv() for remote in self.remotes]
         obs, rews, dones, infos = zip(*results)
-        obs = torch.cat(obs, dim=0)
+        #obs = torch.cat(obs, dim=0)
         self.last_obs = obs
         return obs, rews, dones, infos
     
-    #def get_screen(self):
-    #    for remote in self.remotes:
-    #        remote.send(('get_screen', None))
-    #    results = [remote.recv() for remote in self.remotes]
-    #    screens = torch.cat(results,dim=0)
-    #    return screens
+    def get_screen(self):
+        for remote in self.remotes:
+            remote.send(('get_screen', None))
+        results = [remote.recv() for remote in self.remotes]
+        screens = torch.cat(results,dim=0)
+        return screens
 
     def reset(self, mask=None):
         self._assert_not_closed()
@@ -114,7 +98,7 @@ class MultiprocessVectorEnv:
     
         obs = [remote.recv() if not m else o for m, remote,
                o in zip(mask, self.remotes, self.last_obs)]
-        obs = torch.cat(obs, dim=0)
+        #obs = torch.cat(obs, dim=0)
         self.last_obs = obs
         return obs
 

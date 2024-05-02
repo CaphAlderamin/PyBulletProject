@@ -63,7 +63,8 @@ def collect_trajectories(envs, policy, num_agents, action_size, tmax=200, nrand=
         actions = actions.detach()
         
         # Step the environment using the sampled actions and store the results
-        _, reward, done, _  = envs.step(actions.cpu().numpy())
+        obs, reward, done, _  = envs.step(actions.cpu().numpy())
+        print(obs)
         
         # Convert the rewards and dones to PyTorch tensors
         rewards = to_tensor(reward)

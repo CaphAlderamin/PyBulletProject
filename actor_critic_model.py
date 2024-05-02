@@ -1,113 +1,75 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.distributions.normal import Normal
 
-def build_hidden_layer(input_dim, hidden_layers):
-    """Build hidden layer.
-    Params
-    ======
-        input_dim (int): Dimension of hidden layer input
-        hidden_layers (list(int)): Dimension of hidden layers
-    """
-    hidden = nn.ModuleList([nn.Linear(input_dim, hidden_layers[0])])
-    if len(hidden_layers)>1:
-        layer_sizes = zip(hidden_layers[:-1], hidden_layers[1:])
-        hidden.extend([nn.Linear(h1, h2) for h1, h2 in layer_sizes])
-    return hidden
+def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
+    torch.nn.init.orthogonal_(layer.weight, std)
+    torch.nn.init.constant_(layer.bias, bias_const)
+    return layer
 
 class ActorCritic(nn.Module):
-    def __init__(self,channels,state_size,action_size,shared_layers,
-                 critic_hidden_layers=[],actor_hidden_layers=[],
-                 seed=1, init_type=None):
-        """Initialize parameters and build policy.
-        Params
-        ======
-            state_size (int,int,int): Dimension of each state
-            action_size (int): Dimension of each action
-            shared_layers (list(int)): Dimension of the shared hidden layers
-            critic_hidden_layers (list(int)): Dimension of the critic's hidden layers
-            actor_hidden_layers (list(int)): Dimension of the actor's hidden layers
-            seed (int): Random seed
-            init_type (str): Initialization type
-        """
+    def __init__(self, envs, observation_size, init_type=None):
         super(ActorCritic, self).__init__()
         
-        self.init_type = init_type
-        self.seed = torch.manual_seed(seed)
-        #self.sigma = nn.Parameter(torch.zeros(action_size))
-
-        # Add shared hidden layer
-        # standart layers
-        #self.conv1 = nn.Conv2d(channels, 16, kernel_size=5, stride=2)
-        #self.bn1 = nn.BatchNorm2d(16)
-        #self.conv2 = nn.Conv2d(16, 32, kernel_size=5, stride=2)
-        #self.bn2 = nn.BatchNorm2d(32)
-        #self.conv3 = nn.Conv2d(32, 32, kernel_size=5, stride=2)
-        #self.bn3 = nn.BatchNorm2d(32)
-        # larger layers
-        self.conv1 = nn.Conv2d(channels, 32, kernel_size=5, stride=2)
-        self.bn1 = nn.BatchNorm2d(32)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=5, stride=2)
-        self.bn2 = nn.BatchNorm2d(64)
-        self.conv3 = nn.Conv2d(64, 64, kernel_size=5, stride=2)
-        self.bn3 = nn.BatchNorm2d(64)
-        # larger layers with decreasing kernel_size and stride
-        #self.conv1 = nn.Conv2d(channels, 32, kernel_size=8, stride=4)
-        #self.bn1 = nn.BatchNorm2d(32)
-        #self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2)
-        #self.bn2 = nn.BatchNorm2d(64)
-        #self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
-        #self.bn3 = nn.BatchNorm2d(64)
-
-        # Number of Linear input connections depends on output of conv2d layers
-        # and therefore the input image size, so compute it.
         def conv2d_size_out(size, kernel_size = 5, stride = 2):
             return (size - (kernel_size - 1) - 1) // stride  + 1
-        # for larger layers
-        convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(state_size[0])))
-        convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(state_size[1])))
+        convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(observation_size[0], 8, 4), 4, 2), 3, 1)
+        convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(observation_size[1], 8, 4), 4, 2), 3, 1)
         linear_input_size = convh * convw * 64
-        # for larger layers with decreasing kernel_size and stride
-        #convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(state_size[0], 8, 4), 4, 2), 3, 1)
-        #convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(state_size[1], 8, 4), 4, 2), 3, 1)
-        #linear_input_size = convh * convw * 32
         
-        self.shared_layers = build_hidden_layer(input_dim=linear_input_size,
-                                                hidden_layers=shared_layers)
+        self.init_type = init_type
+        
+        self.network = nn.Sequential(
+            layer_init(nn.Conv2d(3, 16, kernel_size=8, stride=4)),
+            #nn.BatchNorm2d(32), 5
+            nn.ReLU(),
+            layer_init(nn.Conv2d(16, 32, kernel_size=4, stride=2)),
+            #nn.BatchNorm2d(64),
+            nn.ReLU(),
+            layer_init(nn.Conv2d(32, 32, kernel_size=3, stride=1)),
+            #nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.Flatten(),
+            
+            #layer_init(nn.Linear(64 * 2 * 2, 512)),
+            layer_init(nn.Linear(linear_input_size, 512)),
+            nn.ReLU()
+            
+            #layer_init(nn.Linear(linear_input_size, 512)),
+            #nn.LeakyReLU(),
+            #layer_init(nn.Linear(512, 256)),
+            #nn.LeakyReLU(),
+            #layer_init(nn.Linear(256, 128)),
+            #nn.LeakyReLU(),
+            #layer_init(nn.Linear(128, 64)),
+            #nn.LeakyReLU(),
+        )
+        
+        self.critic = layer_init(nn.Linear(512, 1), std=1)
+        self.actor_mean = layer_init(nn.Linear(512, np.prod(envs.action_space.shape)), std=0.01)
+        
+        #self.critic = nn.Sequential(
+        #    layer_init(nn.Linear(64, 512)),
+        #    nn.LeakyReLU(),
+        #    layer_init(nn.Linear(512, 1), std=1),
+        #    nn.LeakyReLU(),
+        #)
+        #self.actor_mean = nn.Sequential(
+        #    layer_init(nn.Linear(64, 512)),
+        #    nn.LeakyReLU(),
+        #    layer_init(nn.Linear(512, np.prod(envs.action_space.shape)), std=0.01),
+        #    nn.LeakyReLU(),
+        #)
+        
+        self.actor_logstd = nn.Parameter(torch.zeros(1, np.prod(envs.action_space.shape)))
 
-        # Add critic layers
-        if critic_hidden_layers:
-            # Add hidden layers for critic net if critic_hidden_layers is not empty
-            self.critic_hidden = build_hidden_layer(input_dim=shared_layers[-1],
-                                                    hidden_layers=critic_hidden_layers)
-            self.critic = nn.Linear(critic_hidden_layers[-1], 1)
-        else:
-            self.critic_hidden = None
-            self.critic = nn.Linear(shared_layers[-1], 1)
-
-        # Add actor layers
-        if actor_hidden_layers:
-            # Add hidden layers for actor net if actor_hidden_layers is not empty
-            self.actor_hidden = build_hidden_layer(input_dim=shared_layers[-1],
-                                                   hidden_layers=actor_hidden_layers)
-            self.actor = nn.Linear(actor_hidden_layers[-1], action_size)
-        else:
-            self.actor_hidden = None
-            self.actor = nn.Linear(shared_layers[-1], action_size)
-
-        # Apply Tanh() to bound the actions
-        self.tanh = nn.Tanh()
-
-        # Initialize hidden and actor-critic layers
         if self.init_type is not None:
-            self.shared_layers.apply(self._initialize)
+            self.network.apply(self._initialize)
             self.critic.apply(self._initialize)
-            self.actor.apply(self._initialize)
-            if self.critic_hidden is not None:
-                self.critic_hidden.apply(self._initialize)
-            if self.actor_hidden is not None:
-                self.actor_hidden.apply(self._initialize)
-
+            self.actor_mean.apply(self._initialize)
+    
     def _initialize(self, n):
         """Initialize network weights.
         """
@@ -128,29 +90,24 @@ class ActorCritic(nn.Module):
                 nn.init.normal_(n.weight.data)
             else:
                 raise KeyError(f'initialization type {self.init_type} not found')
+    
+    def get_value(self, x):
+        #return self.critic(self.network(x / 255))
+        return self.critic(self.network(x))
 
-    def forward(self, state):
-        """Build a network that maps state -> (action, value).
-        """
-        def apply_multi_layer(layers, x, f=F.leaky_relu):
-            for layer in layers:
-                x = f(layer(x))
-            return x
+    def get_action_and_value(self, x, action=None):
+        #print(f"==============x: {x}")
+        #print(f"==============x: {x.shape}")
+        #hidden = self.network(x / 255)
+        hidden = self.network(x)
+        action_mean = self.actor_mean(hidden)
+        action_logstd = self.actor_logstd.expand_as(action_mean)
+        action_std = torch.exp(action_logstd)
+        probs = Normal(action_mean, action_std)
+        if action is None:
+            action = probs.sample()
+        #print(f"action.shape {action.shape}")    
+        
+        return action, probs.log_prob(action).sum(1), probs.entropy().sum(1), self.critic(hidden)
 
-        state = F.relu(self.bn1(self.conv1(state)))
-        state = F.relu(self.bn2(self.conv2(state)))
-        state = F.relu(self.bn3(self.conv3(state)))
-        state = apply_multi_layer(self.shared_layers, state.view(state.size(0),-1))
-
-        v_hid = state
-        if self.critic_hidden is not None:
-            v_hid = apply_multi_layer(self.critic_hidden,v_hid)
-
-        a_hid = state
-        if self.actor_hidden is not None:
-            a_hid = apply_multi_layer(self.actor_hidden,a_hid)
-
-        action = self.tanh(self.actor(a_hid))
-        value = self.critic(v_hid).squeeze(-1)
-        return action, value
     
