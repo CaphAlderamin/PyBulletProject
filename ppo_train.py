@@ -174,8 +174,12 @@ if __name__ == "__main__":
     start_time = timeit.default_timer()
     
     best_mean_reward = None
+    best_mean_reward_percent = None
     scores_window = deque(maxlen=args.scores_window)  # last "100" scores
+    scores_window_percent = deque(maxlen=args.scores_window)
     save_scores = []
+    save_scores_percent = []
+    season_lengths = []
 
     # model learning
     print("\nModel learning start:")
@@ -185,11 +189,16 @@ if __name__ == "__main__":
             frac = 1.0 - (s - 1.0) / args.total_seasons
             lrnow = frac * args.learning_rate
             optimizer.param_groups[0]["lr"] = lrnow
+            # the clipping parameter reduces as time goes on
+            epsilon*=.999
+            # the regulation term also reduces
+            # this reduces exploration in later runs
+            beta*=.998
         
         policy.eval()
         
         old_probs_lst, states_lst, actions_lst, rewards_lst,\
-        values_lst, dones_list = collect_trajectories(
+        rewards_end_lst, values_lst, dones_list = collect_trajectories(
             envs=envs,
             policy=policy, 
             num_agents=num_agents, 
@@ -199,10 +208,21 @@ if __name__ == "__main__":
             seed=args.seed, 
             device = device
         )
+                
+        season_length = rewards_end_lst.numel()
+        season_lengths.append(season_length)
         
-        season_score = rewards_lst.sum(dim=0).sum().item()
+        season_score = rewards_end_lst.sum(dim=0).sum().item()
         scores_window.append(season_score)
         save_scores.append(season_score)
+        
+        season_score_percent = (season_score / season_length) * 100
+        scores_window_percent.append(season_score_percent)
+        save_scores_percent.append(season_score_percent)
+        
+        #print(season_score)
+        #print(season_length)
+        #print(season_accuracy)
         
         gae, target_value = calc_returns(
             rewards = rewards_lst,
@@ -221,6 +241,7 @@ if __name__ == "__main__":
         states_lst = concat_all(states_lst)
         actions_lst = concat_all(actions_lst)
         rewards_lst = concat_all(rewards_lst)
+        rewards_end_lst = concat_all(rewards_end_lst)
         values_lst = concat_all(values_lst)
         gae = concat_all(gae)
         target_value = concat_all(target_value)
@@ -271,12 +292,6 @@ if __name__ == "__main__":
                 torch.nn.utils.clip_grad_norm_(policy.parameters(), 10.0)
                 optimizer.step()
 
-        # the clipping parameter reduces as time goes on
-        epsilon*=.999
-        # the regulation term also reduces
-        # this reduces exploration in later runs
-        beta*=.998
-
         y_pred = values_lst.cpu().numpy()
         y_true = target_value.cpu().numpy()
         var_y = np.var(y_true)
@@ -286,13 +301,19 @@ if __name__ == "__main__":
         writer.add_scalar("epsilon", epsilon, s)
         writer.add_scalar("beta", beta, s)
         mean_reward = np.mean(scores_window)
-        writer.add_scalar("Score", mean_reward, s)
-        writer.add_scalar("Season score", season_score, s)
+        writer.add_scalar("score", mean_reward, s)
+        mean_reward_percent = np.mean(scores_window_percent)
+        writer.add_scalar("score percent", mean_reward_percent, s)
+        writer.add_scalar("season score", season_score, s)
+        writer.add_scalar("season score percent", season_score_percent, s)
         writer.add_scalar("explained_variance", explained_var, s)
 
         # display some progress every n iterations
         elapsed = timeit.default_timer() - start_time
-        print(f"Season {s} end, with score {int(season_score)}, Score: {mean_reward:.3f}, Elapsed time: {timedelta(seconds=elapsed)}")
+        print(f"Season {s} end, " +
+              f"with score {int(season_score)}/{int(season_length)} ({season_score_percent:.3f}%), " +
+              f"Score: {mean_reward:.3f} ({mean_reward_percent:.3f}%), " +
+              f"Elapsed time: {timedelta(seconds=elapsed)}")
         
         if best_mean_reward is None or best_mean_reward+1 < mean_reward:
                     # For saving the model and possibly resuming training
@@ -330,8 +351,8 @@ if __name__ == "__main__":
     if args.info:
         fig = plt.figure()
         plt.plot(np.arange(len(save_scores)), save_scores)
-        plt.ylabel('Score')
-        plt.xlabel('Season #')
+        plt.ylabel('score')
+        plt.xlabel('season #')
         plt.grid()
         plt.show()
     
