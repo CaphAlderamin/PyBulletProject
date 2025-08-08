@@ -24,9 +24,10 @@ def collect_trajectories(envs, policy, num_agents, action_size, tmax=200, nrand=
     
     #initialize returning lists and start the game!
     state_list=[]
-    reward_list=[]
     prob_list=[]
     action_list=[]
+    reward_list=[]
+    reward_end_list=[]
     value_list=[]
     done_list=[]
 
@@ -68,7 +69,6 @@ def collect_trajectories(envs, policy, num_agents, action_size, tmax=200, nrand=
         # Convert the rewards and dones to PyTorch tensors
         rewards = to_tensor(reward)
         dones = to_tensor(done)
-
         state_list.append(states.unsqueeze(0))
         prob_list.append(log_probs.unsqueeze(0))
         action_list.append(actions.unsqueeze(0))
@@ -82,23 +82,27 @@ def collect_trajectories(envs, policy, num_agents, action_size, tmax=200, nrand=
             
             # Log the average rewards for the episode
             avg_episode_rewards = episode_rewards.item() / dones.sum(dim=0).item()
-            writer.add_scalar('Episodes average rewards', avg_episode_rewards, episode_steps.item())
+            writer.add_scalar('episodes average rewards', avg_episode_rewards, episode_steps.item())
             
-            print(f"episode {episode_steps} done, rewards: {int(episode_rewards): <2} ({rewards.cpu().numpy().astype(int)})")
+            print(f"episode {episode_steps} done, " +
+                  f"rewards: {int(episode_rewards): <2} ({rewards.cpu().numpy().astype(int)})")
             
             # Reset the environment and reset the episode rewards and steps
             state = envs.reset()
             episode_rewards = 0
+            
+            reward_end_list.append(rewards.unsqueeze(0))
     
     # Convert the lists to PyTorch tensors            
     prob_list = torch.cat(prob_list, dim=0)
     state_list = torch.cat(state_list, dim=0)
     action_list = torch.cat(action_list, dim=0)
     reward_list = torch.cat(reward_list, dim=0)
+    reward_end_list = torch.cat(reward_end_list, dim=0)
     value_list = torch.cat(value_list, dim=0)
     done_list = torch.cat(done_list, dim=0)
     
-    return prob_list, state_list, action_list, reward_list, value_list, done_list
+    return prob_list, state_list, action_list, reward_list, reward_end_list, value_list, done_list
 
 def calc_returns(rewards, values, dones, gae_lambda, discount_gamma, device=torch.device("cpu")):
     num_step, num_agent = rewards.shape
@@ -151,6 +155,7 @@ def get_screen(env, resize, device=torch.device("cpu")):
 
 def eval_policy(envs, policy, action_size, resize, tmax=1000, device=torch.device("cpu")):
     reward_list=[]
+    states_list=[]
     state = envs.reset()
     #states = torch.Tensor(envs.reset()[0]).to(device)
     for t in range(tmax):
@@ -164,8 +169,9 @@ def eval_policy(envs, policy, action_size, resize, tmax=1000, device=torch.devic
         #states, reward, done, *_  = envs.step(actions[0].cpu().numpy())
         dones = done
         reward_list.append(np.mean(reward))
+        states_list.append(states)
 
         # stop if any of the trajectories is done to have retangular lists
         if np.any(dones):
             break
-    return reward_list
+    return reward_list, states_list

@@ -37,40 +37,21 @@ class ActorCritic(nn.Module):
         #self.sigma = nn.Parameter(torch.zeros(action_size))
 
         # Add shared hidden layer
-        # standart layers
-        #self.conv1 = nn.Conv2d(channels, 16, kernel_size=5, stride=2)
-        #self.bn1 = nn.BatchNorm2d(16)
-        #self.conv2 = nn.Conv2d(16, 32, kernel_size=5, stride=2)
-        #self.bn2 = nn.BatchNorm2d(32)
-        #self.conv3 = nn.Conv2d(32, 32, kernel_size=5, stride=2)
-        #self.bn3 = nn.BatchNorm2d(32)
-        # larger layers
-        self.conv1 = nn.Conv2d(channels, 32, kernel_size=5, stride=2)
-        self.bn1 = nn.BatchNorm2d(32)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=5, stride=2)
-        self.bn2 = nn.BatchNorm2d(64)
-        self.conv3 = nn.Conv2d(64, 64, kernel_size=5, stride=2)
-        self.bn3 = nn.BatchNorm2d(64)
-        # larger layers with decreasing kernel_size and stride
-        #self.conv1 = nn.Conv2d(channels, 32, kernel_size=8, stride=4)
-        #self.bn1 = nn.BatchNorm2d(32)
-        #self.conv2 = nn.Conv2d(32, 64, kernel_size=4, stride=2)
-        #self.bn2 = nn.BatchNorm2d(64)
-        #self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
-        #self.bn3 = nn.BatchNorm2d(64)
+        self.conv1 = nn.Conv2d(channels, 16, kernel_size=5, stride=2)
+        self.bn1 = nn.BatchNorm2d(16)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=5, stride=2)
+        self.bn2 = nn.BatchNorm2d(32)
+        self.conv3 = nn.Conv2d(32, 32, kernel_size=5, stride=2)
+        self.bn3 = nn.BatchNorm2d(32)
+
 
         # Number of Linear input connections depends on output of conv2d layers
         # and therefore the input image size, so compute it.
         def conv2d_size_out(size, kernel_size = 5, stride = 2):
             return (size - (kernel_size - 1) - 1) // stride  + 1
-        # for larger layers
         convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(state_size[0])))
         convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(state_size[1])))
-        linear_input_size = convh * convw * 64
-        # for larger layers with decreasing kernel_size and stride
-        #convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(state_size[0], 8, 4), 4, 2), 3, 1)
-        #convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(state_size[1], 8, 4), 4, 2), 3, 1)
-        #linear_input_size = convh * convw * 32
+        linear_input_size = convh * convw * 32
         
         self.shared_layers = build_hidden_layer(input_dim=linear_input_size,
                                                 hidden_layers=shared_layers)
@@ -136,7 +117,7 @@ class ActorCritic(nn.Module):
             for layer in layers:
                 x = f(layer(x))
             return x
-
+        #print(f"state: {state}, {state.shape}")
         state = F.relu(self.bn1(self.conv1(state)))
         state = F.relu(self.bn2(self.conv2(state)))
         state = F.relu(self.bn3(self.conv3(state)))
@@ -154,3 +135,5 @@ class ActorCritic(nn.Module):
         value = self.critic(v_hid).squeeze(-1)
         return action, value
     
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)

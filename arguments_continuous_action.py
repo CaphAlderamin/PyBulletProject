@@ -55,7 +55,7 @@ def parse_args():
     
     parser.add_argument("--resize-resolution", type=int, default=48,
                         help="resize image resolution while preprocessing input images.")
-    parser.add_argument("--scores-window", type=int, default=100, #default=100
+    parser.add_argument("--scores-window", type=int, default=50, #default=100 
                         help="window for mean model reward.")
     # Model arguments
     parser.add_argument("--model-save", type=lambda x:bool(strtobool(x)), default=False, nargs="?", const=True,
