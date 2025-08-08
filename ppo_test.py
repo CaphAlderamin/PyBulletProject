@@ -1,5 +1,8 @@
 import numpy as np
 
+import matplotlib.pyplot as plt
+import os
+
 import torch
 import torchvision.transforms as T
 from PIL import Image
@@ -8,7 +11,7 @@ from gym import spaces
 from pybullet_envs.bullet.kuka_diverse_object_gym_env import KukaDiverseObjectEnv  
 import pybullet as p
 
-from actor_critic_model import *
+from references.actor_critic_model5 import *
 from model_run import *
 
 from arguments_continuous_action import parse_args
@@ -49,12 +52,10 @@ if __name__ == "__main__":
     # Select a device for PyTorch calculations
     device = select_device(info=True, cuda=True)
     # PATH to evaluate model
-    #PATH = 'models\policy_ppo_m50_normal2.pt'
-    #PATH = 'models\policy_ppo_m50_big1.pt'
-    #PATH = 'models\KukaDiverseObjectGrasping-v0_ppo_continuous_action_s1_03-06-2024_18-07-13\complete_model_.pt'
-    PATH = 'models\KukaDiverseObjectEnv_ppo_continuous_action_s1_03-11-2024_22-54-01\complete_model.pt'
+    PATH = 'models\PPOv4\complete_model.pt'
     
     # Evaluate episodes
+    tests = 5
     episodes = 1000
     
     env = KukaDiverseObjectEnv(
@@ -88,9 +89,12 @@ if __name__ == "__main__":
         channels=3,
         state_size=(screen_height, screen_width),
         action_size=action_size,
-        shared_layers=[512, 256, 128, 64],
-        critic_hidden_layers=[512],
-        actor_hidden_layers=[512],
+        shared_layers=[512, 256, 128],
+        #shared_layers=[512, 256, 128, 64],
+        critic_hidden_layers=[64],
+        actor_hidden_layers=[64],
+        #critic_hidden_layers=[512],
+        #actor_hidden_layers=[512],
         init_type='xavier-uniform',
         seed=0
     ).to(device)
@@ -102,29 +106,53 @@ if __name__ == "__main__":
     # evaluate the model
     print("\nTest episodes:")
     rewards_list = []
-    for e in range(episodes):
-        rewards = eval_policy(
-            envs=env, 
-            policy=policy,
-            action_size=action_size, 
-            resize = resize,
-            device = device
-        )
-        reward = np.sum(rewards,0)
-        rewards_list.append(reward)
-        #print("Episode: {0:d}, reward: {1}".format(e+1, reward), end="\n")
-        print(f"Episode: {e+1}, reward: {reward}")
+    rewards_true_list = []
+    rewards_false_list = []
+    states_lst_lst = []
+    for i in range(tests):
+        for e in range(episodes):
+            rewards, states_lst = eval_policy(
+                envs=env, 
+                policy=policy,
+                action_size=action_size, 
+                resize = resize,
+                device = device
+            )
+            reward = np.sum(rewards,0)
+            rewards_list.append(reward)
+            states_lst_lst.append(states_lst)
+            #print("Episode: {0:d}, reward: {1}".format(e+1, reward), end="\n")
+            print(f"Episode: {e+1}, reward: {reward}")
         
-    rewards_true = rewards_list.count(1)
-    percent_true = (rewards_true / episodes) * 100
-    rewards_false = rewards_list.count(0)
-    percent_false = (rewards_false / episodes) * 100
+        flattened_states_lst = [states_lst for sublist in states_lst_lst for states_lst in sublist]
+        output_dir = 'output_images'
+        os.makedirs(output_dir, exist_ok=True)
+        for idx, states in enumerate(flattened_states_lst, 1):
+            plt.figure()
+            plt.imshow(states[0].cpu().squeeze(0).permute(1, 2, 0).numpy(), interpolation='none')
+            plt.title('Example extracted screen')
+            plt.axis('off')
+            plt.savefig(os.path.join(output_dir, f'{idx}.png'))
+            plt.close()
+        
+        rewards_true = rewards_list.count(1)
+        percent_true = (rewards_true / episodes) * 100
+        rewards_false = rewards_list.count(0)
+        percent_false = (rewards_false / episodes) * 100
+        
+        print("\nThe final result of the training:")
+        print(f"Count of all test episodes: {episodes}")
+        print(f"True  episode count:   {rewards_true}")
+        print(f"True  episode percent: {percent_true}%")
+        print(f"False episode count:   {rewards_false}")
+        print(f"False episode percent: {percent_false}%\n")
+        
+        rewards_true_list.append(percent_true)
+        rewards_false_list.append(percent_false)
+        rewards_list.clear()
     
-    print("\nThe final result of the training:")
-    print(f"Count of all test episodes: {episodes}")
-    print(f"True  episode count:   {rewards_true}")
-    print(f"True  episode percent: {percent_true}%")
-    print(f"False episode count:   {rewards_false}")
-    print(f"False episode percent: {percent_false}%\n")
+    rewards_true_list_std_deviation = np.std(rewards_true_list)
+    rewards_false_list_std_deviation = np.std(rewards_false_list)
     
-    
+    print(f"rewards_true_list_std_deviation:  {rewards_true_list_std_deviation}")
+    print(f"rewards_false_list_std_deviation: {rewards_false_list_std_deviation}%\n")

@@ -10,7 +10,7 @@ import signal
 
 import torch
 
-import gym
+import gym as gym
 from gym import spaces
 from gym.utils import seeding
 from pybullet_envs.bullet.kuka_diverse_object_gym_env import KukaDiverseObjectEnv  

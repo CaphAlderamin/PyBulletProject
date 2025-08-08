@@ -17,6 +17,12 @@ from model_run import *
 
 from arguments_continuous_action import parse_args
 
+activations = {}
+def get_activation(name):
+    def hook(model, input, output):
+        activations[name] = output.detach()
+    return hook
+
 # Cat all agents
 def concat_all(v):
     #print(v.shape)
@@ -124,18 +130,25 @@ if __name__ == "__main__":
         state_size=(screen_height, screen_width),
         action_size=action_size,
         shared_layers=[512, 256, 128, 64],
+        #shared_layers=[512, 256, 128],
         critic_hidden_layers=[512],
+        #critic_hidden_layers=[64],
         actor_hidden_layers=[512],
+        #actor_hidden_layers=[64],
         init_type='xavier-uniform',
         seed=args.seed
     ).to(device)
     # The adam optimizer with learning rate 3e-4 (defoult) (optim.SGD is also possible)
     optimizer = optim.Adam(policy.parameters(), lr=args.learning_rate)
     
+    policy.conv1.register_forward_hook(get_activation('conv1'))
+    policy.conv2.register_forward_hook(get_activation('conv2'))
+    policy.conv3.register_forward_hook(get_activation('conv3'))    
+    
     # variables for saving model
-    policy_shared_layers = [layer.out_features for layer in policy.shared_layers]
-    policy_critic_hidden_layers = [layer.out_features for layer in policy.critic_hidden]
-    policy_actor_hidden_layers = [layer.out_features for layer in policy.actor_hidden]
+    policy_shared_layers = [layer.out_features for layer in policy.shared_layers if isinstance(layer, nn.Linear)]
+    policy_critic_hidden_layers = [layer.out_features for layer in policy.critic_hidden if isinstance(layer, nn.Linear)]
+    policy_actor_hidden_layers = [layer.out_features for layer in policy.actor_hidden if isinstance(layer, nn.Linear)]
     
     if args.info:
         print("\nGPU info:")
@@ -158,7 +171,9 @@ if __name__ == "__main__":
         print(f"policy.actor_hidden_layers: {policy_critic_hidden_layers}")
         print(f"policy.init_type: {policy.init_type}\n")
         print(policy, "\n")
+        print(f'Policy parameters: {count_parameters(policy)}\n')
         print(optimizer, "\n")
+    
     
     # Set up the models non constant parameters
     #discount = args.discount_gamma
@@ -208,7 +223,25 @@ if __name__ == "__main__":
             seed=args.seed, 
             device = device
         )
-                
+        
+        #num_images = len(states_lst)
+        #fig, axes = plt.subplots(1, num_images, figsize=(15, 5))
+        #for ax, states in zip(axes, states_lst):
+        #    ax.imshow(states[0].cpu().squeeze(0).permute(1, 2, 0).numpy(), interpolation='none')
+        #    ax.set_title('Example extracted screen')
+        #    ax.axis('off')
+        #plt.show()
+        
+        #output_dir = 'output_images'
+        #os.makedirs(output_dir, exist_ok=True)
+        #for idx, states in enumerate(states_lst, 1):
+        #    plt.figure()
+        #    plt.imshow(states[0].cpu().squeeze(0).permute(1, 2, 0).numpy(), interpolation='none')
+        #    plt.title('Example extracted screen')
+        #    plt.axis('off')
+        #    plt.savefig(os.path.join(output_dir, f'{idx}.png'))
+        #    plt.close()
+        
         season_length = rewards_end_lst.numel()
         season_lengths.append(season_length)
         
@@ -291,6 +324,19 @@ if __name__ == "__main__":
                 loss.backward(retain_graph=True)
                 torch.nn.utils.clip_grad_norm_(policy.parameters(), 10.0)
                 optimizer.step()
+                
+                # Сохранение активаций в папку output_conv
+                #if b > 5: raise
+                #for layer_name, activation in activations.items():
+                #    #print(f'Layer: {layer_name}, Shape: {activation.shape}')
+                #    img = activation[0, 0].cpu().numpy()
+                #    plt.imshow(img, cmap='gray')
+                #    #plt.title(layer_name)
+                #    output_path = os.path.join('output_conv_16', f'({epoch}-{b})_{layer_name}_{activation.shape}.png')
+                #    plt.axis('off')
+                #    plt.savefig(output_path, bbox_inches='tight', pad_inches=0)
+                #    plt.close()
+                
 
         y_pred = values_lst.cpu().numpy()
         y_true = target_value.cpu().numpy()
@@ -301,7 +347,7 @@ if __name__ == "__main__":
         writer.add_scalar("epsilon", epsilon, s)
         writer.add_scalar("beta", beta, s)
         mean_reward = np.mean(scores_window)
-        writer.add_scalar("score", mean_reward, s)
+        writer.add_scalar("Score", mean_reward, s)
         mean_reward_percent = np.mean(scores_window_percent)
         writer.add_scalar("score percent", mean_reward_percent, s)
         writer.add_scalar("season score", season_score, s)

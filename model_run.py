@@ -69,7 +69,6 @@ def collect_trajectories(envs, policy, num_agents, action_size, tmax=200, nrand=
         # Convert the rewards and dones to PyTorch tensors
         rewards = to_tensor(reward)
         dones = to_tensor(done)
-
         state_list.append(states.unsqueeze(0))
         prob_list.append(log_probs.unsqueeze(0))
         action_list.append(actions.unsqueeze(0))
@@ -156,6 +155,7 @@ def get_screen(env, resize, device=torch.device("cpu")):
 
 def eval_policy(envs, policy, action_size, resize, tmax=1000, device=torch.device("cpu")):
     reward_list=[]
+    states_list=[]
     state = envs.reset()
     #states = torch.Tensor(envs.reset()[0]).to(device)
     for t in range(tmax):
@@ -169,8 +169,9 @@ def eval_policy(envs, policy, action_size, resize, tmax=1000, device=torch.devic
         #states, reward, done, *_  = envs.step(actions[0].cpu().numpy())
         dones = done
         reward_list.append(np.mean(reward))
+        states_list.append(states)
 
         # stop if any of the trajectories is done to have retangular lists
         if np.any(dones):
             break
-    return reward_list
+    return reward_list, states_list
