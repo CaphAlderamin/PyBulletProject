@@ -11,7 +11,7 @@ from gym import spaces
 from pybullet_envs.bullet.kuka_diverse_object_gym_env import KukaDiverseObjectEnv  
 import pybullet as p
 
-from references.actor_critic_model5 import *
+from actor_critic_model import *
 from model_run import *
 
 from arguments_continuous_action import parse_args
