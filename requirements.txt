@@ -1,0 +1,10 @@
+torch==2.7.1+cu118
+torchaudio==2.7.1+cu118
+torchvision==0.22.1+cu118
+pybullet==3.2.6
+gym==0.26.2
+numpy==1.26.4
+matplotlib==3.10.5
+pillow==11.0.0
+tensorboardX==2.6.4
+clearml==2.0.2
